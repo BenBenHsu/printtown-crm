@@ -10,7 +10,7 @@ window.PT_CONFIG = {
   adminEmail: "oface007@gmail.com",
 
   supabase: {
-    url: "請貼上 Project URL，例如 https://abcdefgh.supabase.co",
-    anonKey: "請貼上 Publishable key 或 anon public key"
+    url: "https://rgawaqaumwabfprsnsws.supabase.co",
+    anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnYXdhcWF1bXdhYmZwcnNuc3dzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNzg3NTAsImV4cCI6MjEwNzY1NDc1MH0.QllAs_qWM71KfCdw3hxMNFE0YDp3_YmuVCPe2y6EEhU"
   }
 };
