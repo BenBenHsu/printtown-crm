@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co https://*.googleusercontent.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>普印通案件追蹤</title>
+<meta name="theme-color" content="#f3c300">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="案件追蹤">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- 登入／權限畫面 -->
+<div id="gate" class="gate">
+  <div class="gate-box" id="gateBox">
+    <div class="logo"><i>普</i>案件追蹤</div>
+    <p>載入中…</p>
+  </div>
+</div>
+
+<!-- 主畫面 -->
+<div id="app" hidden>
+<header class="top">
+  <div id="offline" class="offline" hidden>目前離線：可以繼續登錄，連上網路後會自動同步</div>
+  <div class="top-row">
+    <div class="logo"><i>普</i>案件追蹤 <small>詢價・跟進・來源</small></div>
+    <div class="spacer"></div>
+    <div class="user"><b id="meName"></b><button class="btn ghost sm" id="logoutBtn">登出</button></div>
+    <button class="btn primary" id="newBtn">＋ 新增詢價</button>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-view="list" aria-selected="true">案件</button>
+    <button role="tab" data-view="dash" aria-selected="false">儀表板</button>
+    <button role="tab" data-view="stats" aria-selected="false">來源與服務分析</button>
+    <button role="tab" data-view="settings" aria-selected="false">設定</button>
+    <button role="tab" data-view="sys" aria-selected="false" id="sysTab" hidden>系統</button>
+  </nav>
+</header>
+
+<div class="wrap">
+  <div id="dbBanner" class="banner" hidden></div>
+  <section class="view" id="v-list">
+    <div class="kpis" id="kpis"></div>
+    <div class="filters">
+      <div class="chips" id="stageChips"></div>
+      <select id="fOwner" aria-label="接單同仁"></select>
+      <select id="fLine" aria-label="業務線"><option value="">全部業務線</option></select>
+      <select id="fTag" aria-label="標籤" hidden><option value="">全部標籤</option></select>
+      <input type="search" id="fQ" placeholder="搜尋客戶、聯絡人、電話、需求…">
+    </div>
+    <div class="list" id="caseList"></div>
+  </section>
+  <section class="view" id="v-dash" hidden></section>
+  <section class="view" id="v-stats" hidden></section>
+  <section class="view" id="v-settings" hidden></section>
+  <section class="view" id="v-sys" hidden></section>
+</div>
+</div>
+
+<div id="overlayRoot"></div>
+<div id="toast" class="toast" hidden></div>
+
+<script src="config.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
