@@ -21,9 +21,10 @@ export const LOST_REASONS = ["價格／預算問題","需求消失","選擇其�
 export const OLD_LOST = ["價格／預算","選擇其他廠商","需求取消／延後","聯絡不上"];
 export const LOST_RENAME = {"價格／預算":"價格／預算問題","需求取消／延後":"需求消失","聯絡不上":"失聯"};
 export const NEXT_ACTIONS = ["定時48小時追本案","電話追蹤","傳 LINE 追蹤","寄送／確認報價","安排現場勘查","安排施工","其他"];
-export const FIELDS_REV = 31; // 欄位設定版本：舊設定讀進來時自動套用 v3.1 的選項調整
+export const FIELDS_REV = 33; // 欄位設定版本：舊設定讀進來時自動套用 v3.1／v3.3 的調整
 
-export const PRIMARY_LINE = "AQ得來速"; // 預設顯示的業務線，其他業務線的服務收在開關後面
+export const LINE_RENAME = {"AQ得來速":"異味處理"}; // v3.4 業務線改名（舊設定讀進來自動換）
+export const PRIMARY_LINE = "異味處理"; // 預設顯示的業務線，其他業務線的服務收在開關後面
 
 export const DEFAULT_FIELDS = [
   F("date","詢價日期","date","詢價基本",{required:true,sys:true}),
@@ -56,19 +57,19 @@ export const DEFAULT_FIELDS = [
   F("phone2","第二支電話","phone","客戶資料",{enabled:false,col:"right"}),
   F("invoiceTitle","發票抬頭","text","客戶資料",{enabled:false,col:"right"}),
 
-  // 需求內容：預設是詢問 AQ得來速 服務，只留最常用的欄位；其他欄位在「設定 → 欄位管理」可以再打開
+  // 需求內容：預設是詢問異味處理服務，只留最常用的欄位；其他欄位在「設定 → 欄位管理」可以再打開
   F("services","詢問的服務","multi","需求內容",{required:true,sys:true,desc:"選項在「服務項目」設定"}),
-  F("odorType","異味類型","multi","需求內容",{line:"AQ得來速",options:["菸味","寵物味","油煙味","火災","裝潢味","甲醛","廁所／沼氣","其他異味"]}),
-  F("layout","格局","one","需求內容",{line:"AQ得來速",options:["套房","1房1廳","2房1廳","2房2廳","3房1廳","3房2廳","4房2廳","5房以上","商業／辦公空間"]}),
-  F("area","總坪數","num","需求內容",{line:"AQ得來速"}),
+  F("odorType","異味類型","multi","需求內容",{line:"異味處理",options:["菸味","寵物味","油煙味","火災","裝潢味","甲醛","廁所／沼氣","其他異味"]}),
+  F("layout","格局","one","需求內容",{line:"異味處理",options:["套房","1房1廳","2房1廳","2房2廳","3房1廳","3房2廳","4房2廳","5房以上","透天","商業／辦公空間"]}),
+  F("area","總坪數","num","需求內容",{line:"異味處理"}),
   F("need","需求描述","long","需求內容",{desc:"客戶原話最好"}),
   F("photos","現場照片／附件","file","需求內容",{desc:"需開啟 Firebase 檔案儲存後才能使用"}),
   F("caseNote","案件情況敘述","long","需求內容",{enabled:false,builtin:false,desc:"現場狀況、問題經過"}),
   F("assessment","專員評估敘述","long","需求內容",{enabled:false,builtin:false,desc:"專員的判斷：可能成因、建議方案、難易度"}),
-  F("odorSince","發生多久／頻率","text","需求內容",{enabled:false,line:"AQ得來速"}),
-  F("triedBefore","已試過的方法","text","需求內容",{enabled:false,line:"AQ得來速"}),
-  F("complaint","是否有客訴或稽查壓力","yn","需求內容",{enabled:false,line:"AQ得來速"}),
-  F("needReport","是否需要檢測報告","yn","需求內容",{enabled:false,line:"AQ得來速"}),
+  F("odorSince","發生多久／頻率","text","需求內容",{enabled:false,line:"異味處理"}),
+  F("triedBefore","已試過的方法","text","需求內容",{enabled:false,line:"異味處理"}),
+  F("complaint","是否有客訴或稽查壓力","yn","需求內容",{enabled:false,line:"異味處理"}),
+  F("needReport","是否需要檢測報告","yn","需求內容",{enabled:false,line:"異味處理"}),
   F("wantDate","希望完成／到位日期","date","需求內容",{enabled:false}),
   F("budget","客戶預算範圍","one","需求內容",{enabled:false,options:["未提","5 萬以下","5–20 萬","20 萬以上"]}),
 
@@ -81,16 +82,18 @@ export const DEFAULT_FIELDS = [
   F("purchaseWay","採購方式","one","事務機專屬",{enabled:false,line:"事務機",options:["一般租賃","零元機","台銀共契","標案"]}),
 
 
-  F("quoteAmount","報價金額","money","報價",{desc:"選填"}),
-  F("equipQty","使用設備數量","num","報價",{desc:"選填，例如 2 台"}),
+  // v3.3：填台數、選到場，報價金額自動算（單價在「設定 → 報價設定」）
+  F("equipQty","使用設備數量","num","報價",{desc:"AQ得來速商用臭氧機台數"}),
+  F("visit","專員到場","one","報價",{options:["有","沒有"],desc:"有＝加收到場費（整案一次）"}),
+  F("quoteAmount","報價金額","money","報價",{desc:"依數量與到場自動計算（未稅），可手動修改"}),
   F("estAmount","預估金額","money","報價",{enabled:false}),
   F("quoteDate","報價日期","date","報價"),
   F("quoteNo","報價單號","text","報價",{enabled:false}),
   // v3.1「本案總結」：選「成交」顯示成交金額～30日保固；選「未成交」顯示未成交原因；本案備註兩者都有
   F("wonAmount","成交金額","money","報價",{sys:true,sum:"won"}),
   F("wonDate","成交日期","date","報價",{sum:"won",desc:"選「成交」時自動帶入今天，可修改"}),
-  F("deodorPeriod","除味期間","text","報價",{sum:"won",line:"AQ得來速",desc:"例如 10/20～10/27，共 7 天"}),
-  F("effectDate","14天關心除味效果","date","報價",{sys:true,sum:"won",line:"AQ得來速",desc:"成交後自動排在第 15 天，當天上午 8:00 後提醒"}),
+  F("deodorPeriod","除味期間","text","報價",{sum:"won",line:"異味處理",desc:"例如 10/20～10/27，共 7 天"}),
+  F("effectDate","14天關心除味效果","date","報價",{sys:true,sum:"won",line:"異味處理",desc:"成交後自動排在第 15 天，當天上午 8:00 後提醒"}),
   F("warrantyDate","30日滿意保固提醒","date","報價",{sys:true,sum:"won",desc:"成交後自動排在第 30 天，當天上午 8:00 後提醒"}),
   F("lostReason","未成交原因","one","報價",{sys:true,sum:"lost",options:LOST_REASONS}),
   F("closeNote","本案備註","long","報價",{sum:"both",desc:"成交條件、未成交的補充說明"}),

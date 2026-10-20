@@ -1,6 +1,6 @@
 // 離線快取：讓 App 在沒網路時也能打開（資料由 Firestore 自己的離線快取負責）
 // 每次改版請把版本號 +1，同仁下次開啟就會拿到新版
-const VERSION = "pt-crm-v31";
+const VERSION = "pt-crm-v34";
 const SHELL = ["./", "index.html", "styles.css", "app.js", "fb.js", "sbapi.js", "vendor/supabase.js", "fields.js", "config.js",
   "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
 

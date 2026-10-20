@@ -490,3 +490,45 @@ button.line-btn{cursor:pointer}
 .sumseg button[data-s="未成交"][aria-pressed="true"]{background:#8a8f93;color:#fff}
 .sumbox .grid{margin-top:8px}
 .sumbox .sum-hint{font-size:12px;color:var(--muted);margin-top:2px}
+
+/* v3.2 報價 */
+.qcard h3{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.qlist{display:flex;flex-direction:column;gap:6px}
+.qitem{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 12px;cursor:pointer;font:inherit;color:inherit}
+.qitem:hover{border-color:var(--ink2)}
+.qitem small{color:var(--muted)}
+.qtbl input[type=number]{width:80px}
+.qtbl td,.qtbl th{vertical-align:middle}
+.qtbl tfoot td{border-top:1px solid var(--line)}
+.qtbl .qtot td,.qdoc .qtot td{font-size:15px;background:var(--brand-soft)}
+.prtbl input,.prtbl select{width:100%;min-width:60px}
+.qdoc{background:#fff;color:#1c2226;border:1px solid var(--line);border-radius:10px;padding:22px 24px;margin:6px 0 10px;font-size:14px}
+.qdoc-h{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:2px solid #1c2226;padding-bottom:10px;margin-bottom:12px}
+.qdoc-co{font-size:18px;font-weight:700}.qdoc-info{font-size:12px;color:#555;margin-top:2px}
+.qdoc-t{font-size:22px;font-weight:700;letter-spacing:.2em}
+.qdoc table{width:100%;border-collapse:collapse;margin-bottom:12px}
+.qdoc th,.qdoc td{border:1px solid #cfd2cc;padding:6px 9px;text-align:left}
+.qdoc th{background:#f2f3f0;font-weight:500;white-space:nowrap;width:1%}
+.qdoc-items thead th{width:auto}
+.qdoc .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.qdoc .qtot td{font-weight:700;background:#fff4cc}
+.qdoc-note{white-space:pre-wrap;font-size:13px;color:#333}
+#printRoot{display:none}
+@media print{
+  body.printing>*:not(#printRoot){display:none!important}
+  body.printing #printRoot{display:block}
+  body.printing{background:#fff!important}
+  body.printing .qdoc{border:0;padding:0;margin:0}
+  @page{size:A4;margin:16mm}
+}
+.qtbl .num{text-align:right;white-space:nowrap}
+
+/* v3.3 報價區塊即時計算 */
+.qcalc{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;background:var(--brand-soft);border-radius:8px;padding:9px 12px;font-size:13.5px}
+.qcalc small{flex-basis:100%;order:3}
+.qcalc .btn{margin-left:auto}
+.qcalc>span,.qcalc small{min-width:0;flex:1 1 220px;white-space:normal;overflow-wrap:anywhere}
+.f.qcalc{flex-direction:row}
+.sumbox .grid:not(:has(>:not([hidden]))){display:none}
+.qcalc>small{flex:0 0 100%;order:3}
+.list-more{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
