@@ -1,6 +1,6 @@
 // 普印通案件追蹤 v2 — 主程式（欄位可自訂）
 import * as F from "./fb.js";
-export const APP_VERSION="v3.7";
+export const APP_VERSION="v3.9";
 import { GROUPS, TYPES, DEFAULT_FIELDS, PRIMARY_LINE, GROUP_RENAME, LOST_REASONS, OLD_LOST, LOST_RENAME, NEXT_ACTIONS, FIELDS_REV, LINE_RENAME, SERVICE_RENAME, ODOR_RENAME } from "./fields.js";
 
 // 防點擊劫持：被別的網站用框架嵌入時，不顯示內容並跳回自己的網址
@@ -900,7 +900,12 @@ function openForm(id){
       if(wd&&!won&&!wd.closest("[data-fid]").hidden){wd.value=won=today()}
       won=won||(r&&r.wonDate)||today();
       autoSet("effectDate",addDays(won,R().effect.days));autoSet("warrantyDate",addDays(won,R().care.days));
-      const wa=inp("wonAmount"),qa=inp("quoteAmount");if(wa&&!wa.value&&qa&&qa.value)wa.value=qa.value};
+      fillAmt()};
+    // 成交金額：點「成交」時自動帶入最後一次報價的金額（未稅）；沒有報價單就用報價金額欄。同仁自己改過就不再覆蓋
+    const wa0=inp("wonAmount");if(wa0)wa0.addEventListener("input",()=>{wa0.dataset.manual="1"});
+    const fillAmt=()=>{const wa=inp("wonAmount"),qa=inp("quoteAmount");if(!wa||wa.dataset.manual)return;if(r&&r.stage==="成交"&&r.wonAmount!=null&&r.wonAmount!=="")return; // 已成交且存過金額的舊案不覆蓋
+      
+      const lq=r?lastQuoteAmount(r):null,src=lq!=null?lq:(qa&&qa.value!==""?qa.value:null);if(src!=null)wa.value=String(src)};
     syncSum=()=>{
       const st=stSel.value,mode=isOpen(st)?"open":st,ls=S._formLs||new Set();
       box.querySelectorAll(".sumseg button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.s===mode)));
@@ -908,8 +913,8 @@ function openForm(id){
       box.querySelector(".sum-hint").hidden=mode!=="open";
       if(mode==="成交"&&v.stage!=="成交")fillWon(); // 舊的成交案件不補排提醒，避免一次跳出一堆過期提醒
     };
-    box.querySelectorAll(".sumseg button").forEach(b=>b.onclick=()=>{stSel.value=b.dataset.s==="open"?(isOpen(stSel.value)?stSel.value:openStage):b.dataset.s;S.sheetDirty=true;syncSum()});
-    stSel.addEventListener("change",syncSum);
+    box.querySelectorAll(".sumseg button").forEach(b=>b.onclick=()=>{stSel.value=b.dataset.s==="open"?(isOpen(stSel.value)?stSel.value:openStage):b.dataset.s;S.sheetDirty=true;syncSum();if(b.dataset.s==="成交")fillAmt()});
+    stSel.addEventListener("change",()=>{syncSum();if(stSel.value==="成交")fillAmt()});
     const wd=inp("wonDate");if(wd)wd.addEventListener("input",()=>{if(wd.value){autoSet("effectDate",addDays(wd.value,R().effect.days));autoSet("warrantyDate",addDays(wd.value,R().care.days))}});
     // 既有案件的提醒日如果是系統排的，成交日期改了就跟著改
     [["effectDate",R().effect.days],["warrantyDate",R().care.days]].forEach(([id,n])=>{const el=inp(id);if(el&&r&&r.wonDate&&el.value===addDays(r.wonDate,n))el.dataset.auto="1"});
@@ -1025,7 +1030,7 @@ function openDetail(id){
         <label class="f">方式<select id="u_method">${opts([...S.opt.methods,...CARE_METHODS.filter(m=>!S.opt.methods.includes(m))],"電話")}</select></label>
         <label class="f">更新階段<select id="u_stage">${opts(STAGES.map(s=>s.k),r.stage)}</select></label>
         <label class="f full"><span class="lbl">內容 <span class="req">*</span></span><textarea id="u_note" maxlength="5000" placeholder="客戶說了什麼、我們答應了什麼"></textarea></label>
-        <label class="f" id="u_wonW" hidden>成交金額（元）<input type="number" id="u_won" inputmode="numeric" value="${esc(r.wonAmount??r.quoteAmount??r.estAmount??"")}"></label>
+        <label class="f" id="u_wonW" hidden>成交金額（元）<input type="number" id="u_won" inputmode="numeric" value="${esc(r.stage==="成交"&&r.wonAmount!=null?r.wonAmount:(lastQuoteAmount(r)??r.quoteAmount??r.wonAmount??r.estAmount??""))}"></label>
         <label class="f" id="u_wdW" hidden>成交日期<input type="date" id="u_wd" value="${esc(r.wonDate||today())}"></label>
         <label class="f" id="u_dpW" hidden>除味期間<input id="u_dp" maxlength="500" placeholder="例如 10/20～10/27，共 7 天" value="${esc(r.deodorPeriod||"")}"></label>
         <label class="f" id="u_efW" hidden>14天關心除味效果<input type="date" id="u_ef" value="${esc(r.effectDate||"")}"></label>
@@ -1125,6 +1130,7 @@ function normPricing(d){
 }
 S.pricing=normPricing(null);
 const appendArr=(r,key,entry)=>F.arrayUnion&&!(r._fix||[]).includes(key)?F.arrayUnion(entry):[...((S.inq.find(x=>x.id===r.id)||r)[key]||[]),entry];
+const lastQuoteAmount=r=>{const qs=quotesOf(r);const q=qs[qs.length-1];return q&&Number.isFinite(+q.subtotal)?+q.subtotal:null};
 const quotesOf=r=>(Array.isArray(r&&r.quotes)?r.quotes:[]).filter(q=>q&&typeof q==="object"&&Array.isArray(q.lines)).slice().sort((a,b)=>(+a.ver||0)-(+b.ver||0));
 // 計算：品項金額相加 → 減折扣 → 小計（未稅）→ 稅金四捨五入 → 總計（含稅）
 function calcQuote(lines,discount,rate){
@@ -1495,12 +1501,47 @@ function renderSys(){
       <div class="sys-row"><label class="f" style="max-width:220px">期間（依詢價日期）<select id="csvRange">${pick.map(([k,l])=>`<option value="${k}" ${S.csvRange===k?"selected":""}>${l}</option>`).join("")}</select></label>
       <button class="btn primary" id="csvGo">匯出 CSV</button><span class="note" id="csvMsg"></span></div>
     </div>
-    <div id="sysBackup"></div>`;
+    <div id="sysBackup"></div>
+    <div class="card wipe-card"><h3>清空詢價資料 <small>只有管理者可以使用</small></h3>
+      <p class="note" style="margin-top:0">刪除系統裡<b>全部的詢價案件</b>（含追蹤紀錄、報價單），方便重新匯入備份。<b>欄位設定、提醒規則、服務項目、報價設定、同仁名單、標籤、廣告費都會保留</b>；雲端照片也不刪（還原備份後照片連結照常可用）。</p>
+      <p class="note">按下去之前，系統會<b>自動下載一份完整備份</b>。清空後無法復原，只能從備份還原。</p>
+      <div class="form-actions" style="justify-content:flex-start"><button type="button" class="btn danger" id="wipeBtn">清空詢價資料（目前 ${S.inq.length} 筆）</button><span class="note" id="wipeMsg"></span></div>
+    </div>`;
   const rows=()=>{const k=S.csvRange;const st=k==="all"?"0000-00-00":k==="year"?today().slice(0,4)+"-01-01":k==="month"?today().slice(0,8)+"01":(()=>{const x=new Date();x.setDate(x.getDate()-90);return ymd(x)})();
     return S.inq.filter(r=>(r.date||"")>=st)};
   V.querySelector("#csvRange").onchange=e=>{S.csvRange=e.target.value};
   V.querySelector("#csvGo").onclick=()=>{const rs=rows();exportCsv(rs);V.querySelector("#csvMsg").textContent=`已匯出 ${rs.length} 筆`};
   renderBackup(V.querySelector("#sysBackup"));
+  setupWipe(V);
+}
+// v3.9 清空詢價資料：只有管理者；要「連續按兩次」才執行（第二次要在第一次之後 0.8～8 秒內，避免手滑連點）
+function setupWipe(V){
+  const btn=V.querySelector("#wipeBtn"),msg=V.querySelector("#wipeMsg");if(!btn)return;
+  let armedAt=0,timer=null,busy=false;
+  const label=()=>`清空詢價資料（目前 ${S.inq.length} 筆）`;
+  const disarm=()=>{armedAt=0;clearTimeout(timer);btn.classList.remove("armed");btn.textContent=label();if(!busy)msg.textContent=""};
+  btn.onclick=async()=>{
+    if(busy)return;
+    if(!S.isAdmin){msg.textContent="只有管理者可以清空";return}
+    if(!S.inq.length){msg.textContent="目前沒有詢價資料";return}
+    const now=Date.now();
+    if(!armedAt){armedAt=now;btn.classList.add("armed");btn.textContent=`再按一次，確定清空 ${S.inq.length} 筆`;msg.textContent="8 秒內沒有再按，就自動取消";
+      clearTimeout(timer);timer=setTimeout(disarm,8000);return}
+    if(now-armedAt<800)return; // 手滑連點不算第二次
+    clearTimeout(timer);busy=true;btn.disabled=true;btn.classList.remove("armed");
+    // 先自動下載備份
+    try{const data=buildBackup(),name="普印通案件追蹤_清空前備份_"+today()+".json";saveFile(name,JSON.stringify(data,null,1),"application/json");
+      S.meta={...(S.meta||{}),lastBackupAt:new Date().toISOString(),lastBackupBy:S.me};write(F.setDoc(F.doc(fs,"config","meta"),S.meta))}
+    catch(e){busy=false;btn.disabled=false;disarm();msg.textContent="備份下載失敗，沒有清空："+errText(e);return}
+    const ids=S.inq.map(r=>r.id);let done=0,fail=0;
+    for(let i=0;i<ids.length;i+=20){
+      await Promise.all(ids.slice(i,i+20).map(id=>{try{return F.deleteDoc(F.doc(fs,"inquiries",id)).then(()=>done++).catch(()=>fail++)}catch(e){fail++;return null}}));
+      msg.textContent=`清空中… ${done+fail} / ${ids.length}`;
+    }
+    busy=false;btn.disabled=false;armedAt=0;btn.textContent=label();
+    msg.textContent=fail?`已刪除 ${done} 筆，${fail} 筆失敗（可能是權限或網路），可以再按一次清空剩下的`:`已清空 ${done} 筆。現在可以到上方「從備份還原」匯入備份檔`;
+    toast(fail?"部分清空失敗":"已清空詢價資料");
+  };
 }
 
 /* ---------- 儀表板：客戶分析、全部詢價紀錄 ---------- */

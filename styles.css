@@ -567,3 +567,7 @@ button.line-btn{cursor:pointer}
 .cust-type{display:flex;gap:8px;align-items:stretch}
 .cust-type select{flex:0 0 88px;width:88px}
 .cust-type input{flex:1 1 auto;min-width:0}
+
+/* v3.9 清空詢價資料 */
+.wipe-card{border-color:var(--danger-soft)}
+#wipeBtn.armed{background:var(--danger);color:#fff;border-color:var(--danger)}
