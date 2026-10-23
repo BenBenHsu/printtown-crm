@@ -10,7 +10,7 @@ export const TYPES = {
   phone:"電話", email:"Email", yn:"是／否", auto:"自動產生", file:"照片／檔案", tags:"標籤"
 };
 
-export const AREAS = ["臺北市","新北市","桃園市","臺中市","臺南市","高雄市","基隆／宜蘭","新竹／苗栗","彰化／南投／雲林","嘉義／屏東","花東／離島"];
+export const AREAS = ["尚未確認","臺北市","新北市","桃園市","臺中市","臺南市","高雄市","基隆／宜蘭","新竹／苗栗","彰化／南投／雲林","嘉義／屏東","花東／離島"];
 export const CITIES = ["臺北市","新北市","桃園市","臺中市","臺南市","高雄市","基隆市","新竹市","新竹縣","苗栗縣","彰化縣","南投縣","雲林縣","嘉義市","嘉義縣","屏東縣","宜蘭縣","花蓮縣","臺東縣","澎湖縣","金門縣","連江縣"];
 
 // sys: 系統必需，不能停用、不能改類型（分析與提醒要用）
@@ -21,8 +21,11 @@ export const LOST_REASONS = ["價格／預算問題","需求消失","選擇其�
 export const OLD_LOST = ["價格／預算","選擇其他廠商","需求取消／延後","聯絡不上"];
 export const LOST_RENAME = {"價格／預算":"價格／預算問題","需求取消／延後":"需求消失","聯絡不上":"失聯"};
 export const NEXT_ACTIONS = ["定時48小時追本案","電話追蹤","傳 LINE 追蹤","寄送／確認報價","安排現場勘查","安排施工","其他"];
-export const FIELDS_REV = 33; // 欄位設定版本：舊設定讀進來時自動套用 v3.1／v3.3 的調整
+export const FIELDS_REV = 35; // 欄位設定版本：舊設定讀進來時自動套用 v3.1／v3.3 的調整
 
+// v3.6 服務項目改名（舊案件的服務名稱自動對應）
+export const SERVICE_RENAME = {"異味治理":"異味處理","空品檢測／監測":"空品檢測","清味門除味液":"除味液"};
+export const ODOR_RENAME = {"其他":"不明異味","其他異味":"不明異味","其他味道":"不明異味"};
 export const LINE_RENAME = {"AQ得來速":"異味處理"}; // v3.4 業務線改名（舊設定讀進來自動換）
 export const PRIMARY_LINE = "異味處理"; // 預設顯示的業務線，其他業務線的服務收在開關後面
 
@@ -43,7 +46,8 @@ export const DEFAULT_FIELDS = [
   F("utm","廣告活動代碼","text","來源",{enabled:false}),
 
   // col: "left" 左欄（必要）／"right" 右欄（次要）／"" 自動排列
-  F("company","公司／單位名稱","text","客戶資料",{required:true,sys:true,col:"left",desc:"個人客戶可填姓名"}),
+  // v3.6：先選「公司／個人」；選個人直接記為「個人」，選公司才出現名稱欄（可以不填）
+  F("company","公司／單位名稱","text","客戶資料",{sys:true,col:"left",hl:true,desc:"公司名稱（可以先不填）"}),
   F("contact","聯絡人","text","客戶資料",{required:true,col:"left"}),
   F("title","聯絡人職稱／身份","text","客戶資料",{required:true,col:"left",desc:"例如：店長、總務、採購、老闆、屋主、房客"}),
   F("phone","電話","phone","客戶資料",{required:true,col:"left",hl:true}),
@@ -59,15 +63,15 @@ export const DEFAULT_FIELDS = [
 
   // 需求內容：預設是詢問異味處理服務，只留最常用的欄位；其他欄位在「設定 → 欄位管理」可以再打開
   F("services","詢問的服務","multi","需求內容",{required:true,sys:true,desc:"選項在「服務項目」設定"}),
-  F("odorType","異味類型","multi","需求內容",{line:"異味處理",options:["菸味","寵物味","油煙味","火災","裝潢味","甲醛","廁所／沼氣","其他異味"]}),
+  F("odorType","異味類型","multi","需求內容",{line:"異味處理",options:["菸味","寵物味","油煙味","火災","裝潢味","甲醛","廁所／沼氣","薰香香氛","不明異味"]}),
   F("layout","格局","one","需求內容",{line:"異味處理",options:["套房","1房1廳","2房1廳","2房2廳","3房1廳","3房2廳","4房2廳","5房以上","透天","商業／辦公空間"]}),
   F("area","總坪數","num","需求內容",{line:"異味處理"}),
   F("need","需求描述","long","需求內容",{desc:"客戶原話最好"}),
+  F("triedBefore","目前做了哪些處理","long","需求內容",{desc:"選填，例如：自己噴過除臭劑、開窗通風一週、找過清潔公司"}),
   F("photos","現場照片／附件","file","需求內容",{desc:"需開啟 Firebase 檔案儲存後才能使用"}),
   F("caseNote","案件情況敘述","long","需求內容",{enabled:false,builtin:false,desc:"現場狀況、問題經過"}),
   F("assessment","專員評估敘述","long","需求內容",{enabled:false,builtin:false,desc:"專員的判斷：可能成因、建議方案、難易度"}),
   F("odorSince","發生多久／頻率","text","需求內容",{enabled:false,line:"異味處理"}),
-  F("triedBefore","已試過的方法","text","需求內容",{enabled:false,line:"異味處理"}),
   F("complaint","是否有客訴或稽查壓力","yn","需求內容",{enabled:false,line:"異味處理"}),
   F("needReport","是否需要檢測報告","yn","需求內容",{enabled:false,line:"異味處理"}),
   F("wantDate","希望完成／到位日期","date","需求內容",{enabled:false}),
@@ -83,7 +87,7 @@ export const DEFAULT_FIELDS = [
 
 
   // v3.3：填台數、選到場，報價金額自動算（單價在「設定 → 報價設定」）
-  F("equipQty","使用設備數量","num","報價",{desc:"AQ得來速商用臭氧機台數"}),
+  F("equipQty","使用設備數量","num","報價",{desc:"AQ得來速商用臭氧服務台數"}),
   F("visit","專員到場","one","報價",{options:["有","沒有"],desc:"有＝加收到場費（整案一次）"}),
   F("quoteAmount","報價金額","money","報價",{desc:"依數量與到場自動計算（未稅），可手動修改"}),
   F("estAmount","預估金額","money","報價",{enabled:false}),

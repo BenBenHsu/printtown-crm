@@ -1,7 +1,7 @@
 // 普印通案件追蹤 v2 — 主程式（欄位可自訂）
 import * as F from "./fb.js";
-export const APP_VERSION="v3.4";
-import { GROUPS, TYPES, DEFAULT_FIELDS, PRIMARY_LINE, GROUP_RENAME, LOST_REASONS, OLD_LOST, LOST_RENAME, NEXT_ACTIONS, FIELDS_REV, LINE_RENAME } from "./fields.js";
+export const APP_VERSION="v3.7";
+import { GROUPS, TYPES, DEFAULT_FIELDS, PRIMARY_LINE, GROUP_RENAME, LOST_REASONS, OLD_LOST, LOST_RENAME, NEXT_ACTIONS, FIELDS_REV, LINE_RENAME, SERVICE_RENAME, ODOR_RENAME } from "./fields.js";
 
 // 防點擊劫持：被別的網站用框架嵌入時，不顯示內容並跳回自己的網址
 if(F.FRAME_GUARD&&window.top!==window.self){document.documentElement.style.display="none";try{window.top.location.replace(window.self.location.href)}catch(e){}throw new Error("framed")}
@@ -16,8 +16,8 @@ const isOpen = s => !!(STAGE_MAP[s]||{}).open;
 const DEFAULT_OPT = {
   services:[
     {line:"事務機",name:"事務機租賃（含零元機）"},{line:"事務機",name:"耗材／維修"},
-    {line:"異味處理",name:"異味治理"},{line:"異味處理",name:"空品檢測／監測"},{line:"異味處理",name:"設備租賃（臭氧機／清淨機）"},
-    {line:"異味處理",name:"清味門除味液"}],
+    {line:"異味處理",name:"異味處理"},{line:"異味處理",name:"空品檢測"},{line:"異味處理",name:"設備租賃（臭氧機／清淨機）"},
+    {line:"異味處理",name:"除味液"},{line:"異味處理",name:"全身除味機"},{line:"異味處理",name:"其他"}],
   methods:["電話","LINE／Email","現場拜訪","客戶關懷"]
 };
 // 不能在表單直接編輯的欄位（由系統處理）
@@ -82,7 +82,9 @@ function normInq(r){
   if(fix.length)Object.defineProperty(r,"_fix",{value:fix,enumerable:false});
   ["date","code","stage","owner","company","contact","phone","nextDate","nextAction","quoteDate","wonDate","closedAt","reopenedAt","effectDate","warrantyDate","lostReason","visit"].forEach(k=>{if(r[k]!=null&&typeof r[k]!=="string")r[k]=String(r[k])});
   // v3.1 選項改名：舊資料顯示成新名稱（下次儲存時寫入新名稱）
-  if(Array.isArray(r.odorType))r.odorType=[...new Set(r.odorType.map(x=>x==="其他"?"其他異味":x))];
+  if(Array.isArray(r.odorType))r.odorType=[...new Set(r.odorType.map(x=>ODOR_RENAME[x]||x))];
+  if(Array.isArray(r.services))r.services=[...new Set(r.services.map(x=>SERVICE_RENAME[x]||x))];
+  if(r.custType!=="個人"&&r.custType!=="公司")r.custType=r.company==="個人"?"個人":"公司";
   if(r.lostReason&&LOST_RENAME[r.lostReason])r.lostReason=LOST_RENAME[r.lostReason];
   return r;
 }
@@ -102,6 +104,8 @@ const shortDate = s => s?s.slice(5).replace("-","/"):"";
 const staff = () => {const n=S.members.map(m=>m.name).filter(Boolean);if(S.me&&!n.includes(S.me))n.unshift(S.me);return n};
 const newId = () => Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const fld = id => S.fields.find(f=>f.id===id);
+// 客戶顯示名稱：個人客戶顯示「聯絡人（個人）」，公司沒填名稱就顯示聯絡人
+const custName = r => r.company==="個人"?((r.contact||"")?r.contact+"（個人）":"個人"):(r.company||r.contact||"（未填客戶）");
 const on = id => {const f=fld(id);return !!(f&&f.enabled)};
 function optionsOf(f){
   if(f.id==="stage")return STAGES.map(s=>s.k);
@@ -190,6 +194,23 @@ function mergeFields(saved,rev){
   if(!(+rev>=31))saved=migrate31(saved);
   if(!(+rev>=32))saved=migrate32(saved);
   if(!(+rev>=33))saved=saved.map(f=>{if(f.id!=="layout"||f.options.includes("透天"))return f;const o=f.options.slice(),i=o.indexOf("商業／辦公空間");i<0?o.push("透天"):o.splice(i,0,"透天");return {...f,options:o}});
+  if(!(+rev>=34))saved=saved.map(f=>{
+    if(f.id==="odorType"){let o=[...new Set(f.options.map(x=>ODOR_RENAME[x]||x))];
+      if(!o.includes("薰香香氛"))o.push("薰香香氛");if(!o.includes("其他味道"))o.push("其他味道");
+      const tail=["不明異味","薰香香氛","其他味道"].filter(x=>o.includes(x));o=[...o.filter(x=>!tail.includes(x)),...tail];return {...f,options:o}}
+    if(f.id==="city"&&!f.options.includes("尚未確認"))return {...f,options:["尚未確認",...f.options]};
+    if(f.id==="company")return {...f,required:false,desc:DEFAULT_FIELDS.find(d=>d.id==="company").desc};
+    return f});
+  if(!(+rev>=35)){
+    saved=saved.map(f=>{
+      if(f.id==="odorType"){let o=[...new Set(f.options.map(x=>ODOR_RENAME[x]||x))].filter(x=>x!=="其他味道");
+        const i=o.indexOf("薰香香氛"),j=o.indexOf("不明異味");if(i>=0&&j>=0&&j<i){o.splice(i,1);o.splice(j,0,"薰香香氛")}return {...f,options:o}}
+      if(f.id==="triedBefore"){const d=DEFAULT_FIELDS.find(x=>x.id==="triedBefore");return {...f,name:d.name,type:"long",line:"",enabled:true,desc:d.desc}}
+      return f});
+    const ti=saved.findIndex(f=>f.id==="triedBefore"),ni=saved.findIndex(f=>f.id==="need");
+    if(ti>=0&&ni>=0){const [t]=saved.splice(ti,1);const n2=saved.findIndex(f=>f.id==="need");saved.splice(n2+1,0,{...t,group:saved[n2].group})}
+    else if(ti<0&&ni>=0){saved.splice(ni+1,0,{...DEFAULT_FIELDS.find(x=>x.id==="triedBefore"),group:saved[ni].group})}
+  }
   saved=saved.map(f=>LINE_RENAME[f.line]?{...f,line:LINE_RENAME[f.line]}:f);
   const ids=new Set(saved.map(f=>f.id));
   const out=saved.map(f=>{const d=DEFAULT_FIELDS.find(x=>x.id===f.id);return d?{...d,...f,sys:d.sys,builtin:d.builtin,sum:d.sum||"",type:d.sys||d.builtin?d.type:f.type}:{...f,sum:""}});
@@ -201,6 +222,17 @@ function mergeGroups(saved,fields){
   if(isOldLayout(saved))saved=[...GROUPS,...saved.filter(g=>!GROUP_RENAME[g]&&!GROUPS.includes(g))];
   const out=(Array.isArray(saved)&&saved.length?saved:GROUPS).filter((g,i,a)=>g&&a.indexOf(g)===i);
   fields.forEach(f=>{if(f.group&&!out.includes(f.group))out.push(f.group)});
+  return out;
+}
+// v3.6：服務項目改名、補上新項目（管理者存過服務項目設定後就以設定為準）
+const OPT_REV=36;
+function migrateServices(list,rev){
+  let out=list.filter(x=>x&&typeof x==="object").map(x=>({...x,line:LINE_RENAME[x.line]||x.line,name:SERVICE_RENAME[x.name]||x.name}));
+  out=out.filter((x,i)=>out.findIndex(y=>y.name===x.name)===i);
+  if(!(+rev>=OPT_REV)){const P=PRIMARY_LINE;DEFAULT_OPT.services.filter(d=>d.line===P&&!out.some(x=>x.name===d.name)).forEach(d=>out.push({...d}));
+    const order=DEFAULT_OPT.services.filter(d=>d.line===P).map(d=>d.name);
+    const prim=out.filter(x=>x.line===P).sort((a,b)=>{const i=order.indexOf(a.name),j=order.indexOf(b.name);return (i<0?99:i)-(j<0?99:j)});
+    out=[...out.filter(x=>x.line!==P),...prim]}
   return out;
 }
 const primaryLine=()=>{const p=S.opt.primaryLine;return (p&&(LINE_RENAME[p]||p))||PRIMARY_LINE};
@@ -272,7 +304,7 @@ function startData(){
   S.unsubs.push(F.onSnapshot(F.doc(fs,"config","options"),snap=>{
     S.raw.options=snap.exists()?snap.data():null;
     if(snap.exists()){
-      const d=snap.data();S.opt=Object.assign({},DEFAULT_OPT,{services:(Array.isArray(d.services)?d.services:DEFAULT_OPT.services).map(x=>x&&LINE_RENAME[x.line]?{...x,line:LINE_RENAME[x.line]}:x),methods:d.methods||DEFAULT_OPT.methods});
+      const d=snap.data();S.opt=Object.assign({},DEFAULT_OPT,{services:migrateServices(Array.isArray(d.services)?d.services:DEFAULT_OPT.services,d.rev),methods:d.methods||DEFAULT_OPT.methods});
       // 第一版的來源與未成交原因選項，搬到欄位設定（只在欄位尚未存過時）
       S.v1opt={channels:d.channels,lossReasons:d.lossReasons};applyV1();
     }
@@ -414,7 +446,7 @@ function showPopup(){
   const nxt=S.inq.filter(r=>nextDue(r)&&mineOrAll(r)&&!S.popSeen.has("n"+r.id+r.nextDate)&&!rem.includes(r)&&!quo.includes(r)&&!S.popSeen.has("r"+r.id)&&!S.popSeen.has("q"+r.id));
   if(!rem.length&&!care.length&&!quo.length&&!nxt.length&&!eff.length)return;
   const rr=R();
-  const item=(r,txt)=>`<button class="pop-item" data-id="${esc(r.id)}"><b>${esc(r.company||"（未填客戶）")}</b><span>${esc(txt)}</span></button>`;
+  const item=(r,txt)=>`<button class="pop-item" data-id="${esc(r.id)}"><b>${esc(custName(r))}</b><span>${esc(txt)}</span></button>`;
   const sh=openSheet(`<div class="sheet-head"><div><h2>追蹤提醒</h2><div class="sub">點一筆直接打開案件</div></div><button class="btn ghost" data-close>關閉</button></div>
     ${rem.length?`<div class="card pop remind"><h3>詢價超過 ${rr.remind.hours} 小時，還沒有追蹤紀錄 <small>${rem.length} 件</small></h3>${rem.map(r=>item(r,`已 ${hoursSinceCreated(r)} 小時 · ${(r.services||[]).join("、")} · ${r.owner||"未指派"}`)).join("")}</div>`:""}
     ${quo.length?`<div class="card pop quote"><h3>報價後超過 ${rr.quote.hours} 小時，還沒有追蹤 <small>${quo.length} 件</small></h3>${quo.map(r=>item(r,`報價後 ${hoursSinceQuote(r)} 小時 · ${r.quoteAmount?money(r.quoteAmount)+" · ":""}${r.owner||"未指派"}`)).join("")}</div>`:""}
@@ -435,7 +467,7 @@ function showPopup(){
 const LINE_MAX=1200;
 function lineText(r){
   const L=[],add=(k,v)=>{v=Array.isArray(v)?v.filter(Boolean).join("、"):String(v==null?"":v).trim();if(v)L.push(k+"："+v)};
-  L.push("【普印通詢價】"+(r.company||r.contact||"（未填客戶）"));
+  L.push("【普印通詢價】"+custName(r));
   add("聯絡人",[r.contact,r.title?"（"+r.title+"）":""].join(""));
   add("電話",r.phone);
   if(on("lineId"))add("LINE ID",r.lineId);
@@ -481,7 +513,7 @@ const lineBtn=(r,cls="")=>`<button type="button" class="line-btn ${cls}" data-li
 function openLineShare(id){
   const r=S.inq.find(x=>x.id===id);if(!r)return;
   const back=$("#overlayRoot").querySelector(".sheet")?id:null; // 從案件詳細頁打開的，關閉後回到詳細頁
-  const sh=openSheet(`<div class="sheet-head"><div><h2>分享到 LINE</h2><div class="sub">${esc(r.company||r.contact||"（未填客戶）")}</div></div><button class="btn ghost" data-close>關閉</button></div>
+  const sh=openSheet(`<div class="sheet-head"><div><h2>分享到 LINE</h2><div class="sub">${esc(custName(r))}</div></div><button class="btn ghost" data-close>關閉</button></div>
     <div class="card"><label class="f full"><span class="lbl">要傳的內容（可以先修改、加一句問候）</span><textarea id="lsTxt" rows="8" maxlength="${LINE_MAX+200}">${esc(lineText(r))}</textarea></label></div>
     <div class="share-acts">${IS_MOBILE?`
       ${CAN_SHARE?`<button type="button" class="btn primary big" data-act="share">傳到 LINE（選擇對象）</button>`:""}
@@ -669,7 +701,7 @@ function renderListInner(){
       if(r.autoLost&&r.stage==="未成交")u+=`<span class="flag auto">系統結案</span>`;
       return `<div class="row ${ds}" role="button" tabindex="0" data-id="${esc(r.id)}">
         <span class="bar"></span>
-        <span class="cust"><b>${u}${esc(r.company||r.contact||"（未填客戶）")}</b>${on("tags")?rowTags(r):""}${contactLine(r)}${askInfo(r)}</span>
+        <span class="cust"><b>${u}${esc(custName(r))}</b>${on("tags")?rowTags(r):""}${contactLine(r)}${askInfo(r)}</span>
         ${quoteCell(r)}
         <span class="stwrap"><span class="stage ${st.c}">${esc(r.stage||"新詢問")}</span></span>
         <span class="next ${ds}"><span class="when">${esc(whenTxt)}</span>${ds!=="closed"?`<span>${esc(r.nextAction||"")}</span>`:""}</span>
@@ -771,11 +803,15 @@ function inputHtml(f,v){
       <label class="btn sm photo-add"><input type="file" accept="image/*" multiple data-pick="${esc(f.id)}" hidden>＋ 加入照片</label>
       <div class="note" style="margin-top:4px">手機可以直接拍照。上傳前會自動壓縮成長邊 1600 像素，一張約 200–400 KB。</div></div>`;
     case "auto":return `<div class="f" data-fid="${esc(f.id)}">${lab}<input disabled value="${esc(v||"建立後自動產生")}"></div>`;
-    default:ctl=`<input id="${id}" value="${esc(v)}"${ph} maxlength="${f.id==="company"?200:500}">`;
+    default:
+      if(f.id==="company"){const isP=v==="個人";
+        ctl=`<span class="cust-type"><select id="x_custType" aria-label="公司或個人"><option value="公司" ${isP?"":"selected"}>公司</option><option value="個人" ${isP?"selected":""}>個人</option></select><input id="${id}" value="${esc(isP?"":v)}"${ph} maxlength="200" ${isP?"hidden":""}></span>`;break}
+      ctl=`<input id="${id}" value="${esc(v)}"${ph} maxlength="500">`;
   }
   return `<label class="f${full}" data-fid="${esc(f.id)}" data-line="${esc(f.line||"")}">${lab}${ctl}</label>`;
 }
 function readField(sh,f){
+  if(f.id==="company"){const t=sh.querySelector("#x_custType");if(t&&t.value==="個人")return "個人"}
   if(f.type==="multi"||f.type==="tags"){const box=sh.querySelector(`[data-multi="${f.id}"]`);return box?[...box.querySelectorAll('.tog[aria-pressed="true"]')].map(b=>b.dataset.v):[]}
   const el=sh.querySelector("#x_"+f.id);if(!el||el.disabled)return undefined;
   const v=el.value.trim();
@@ -882,6 +918,9 @@ function openForm(id){
   if(!r){const d=sh.querySelector("#x_date"),nd=sh.querySelector("#x_nextDate");
     if(d&&nd){nd.dataset.auto="1";nd.addEventListener("input",()=>{delete nd.dataset.auto});
       d.addEventListener("input",()=>{if(nd.dataset.auto&&/^\d{4}-\d{2}-\d{2}$/.test(d.value))nd.value=nextDefault(d.value)})}}
+  // 公司／個人：選個人就不用打名稱；選公司才出現名稱欄（可以不填）
+  {const ct=sh.querySelector("#x_custType"),ci=sh.querySelector("#x_company");
+   if(ct&&ci)ct.addEventListener("change",()=>{ci.hidden=ct.value==="個人";if(!ci.hidden)ci.focus()})}
   syncLines();
   // 「建立並報價」：一般按鈕觸發送出（按 Enter 仍然是「建立案件」）
   let wantQuote=false;
@@ -918,6 +957,7 @@ function openForm(id){
       data[f.id]=val;
       if(f.required&&(val===""||val==null||(Array.isArray(val)&&!val.length)))miss.push(f.name);
     });
+    {const ct=sh.querySelector("#x_custType");if(ct&&"company" in data)data.custType=ct.value==="個人"?"個人":"公司"}
     if(busy){sh.querySelector("#fErr").textContent="照片還在上傳，請稍候再按";return}
     if(miss.length){sh.querySelector("#fErr").textContent="請填寫："+miss.join("、");return}
     data.updatedAt=new Date().toISOString();data.updatedBy=S.email;
@@ -970,7 +1010,7 @@ function openDetail(id){
     return items?`<div class="dgroup"><h4>${esc(g)}</h4><dl class="dl">${items}</dl></div>`:"";
   }).join("")+(r.closedAt?`<div class="dgroup"><dl class="dl"><dt>結案日期</dt><dd class="num">${esc(r.closedAt)}</dd></dl></div>`:"");
   const sh=openSheet(`
-    <div class="sheet-head"><div><h2>${esc(r.company||"（未填客戶）")}</h2><div class="sub"><span class="stage ${st.c}">${esc(r.stage)}</span> · ${esc(r.owner||"未指派")} · 詢價 ${esc(r.date||"")}${r.code?" · "+esc(r.code):""}</div></div>${lineBtn(r,"btn sm")}<button class="btn sm" id="dEdit">編輯</button><button class="btn ghost" data-close>關閉</button></div>
+    <div class="sheet-head"><div><h2>${esc(custName(r))}</h2><div class="sub"><span class="stage ${st.c}">${esc(r.stage)}</span> · ${esc(r.owner||"未指派")} · 詢價 ${esc(r.date||"")}${r.code?" · "+esc(r.code):""}</div></div>${lineBtn(r,"btn sm")}<button class="btn sm" id="dEdit">編輯</button><button class="btn ghost" data-close>關閉</button></div>
     ${effectDue(r)?`<div class="banner-in care">14天關心除味效果：成交已 ${wonDays(r)} 天，請聯絡客戶確認除味效果（味道是否改善、有沒有復發）。<button type="button" class="btn sm" id="doEff">填寫關心紀錄</button></div>`:""}
     ${r.effectDoneAt?`<div class="banner-in done">已於 ${esc(r.effectDoneAt)} 關心除味效果</div>`:""}
     ${careDue(r)?`<div class="banner-in care">30日滿意保固提醒：成交已 ${wonDays(r)} 天，請聯絡客戶確認滿意度與保固事項。<button type="button" class="btn sm" id="doCare">填寫保固確認</button></div>`:""}
@@ -1058,22 +1098,30 @@ function openDetail(id){
 /* ---------- 報價（v3.2） ---------- */
 // 單價、稅率放在 config/pricing，只有管理者可以改；每份報價單把當下的品項與金額存進案件的 quotes（之後調價不影響舊報價單）
 const PRICING_DEFAULT={
-  items:[{id:"ozone",name:"AQ得來速商用臭氧機",unit:"台",price:5200,kind:"qty",note:"每台每次施工"},
+  items:[{id:"ozone",name:"AQ得來速商用臭氧服務（商用臭氧機、商用除味扇）",unit:"台",price:5200,kind:"qty",note:"每台每次施工"},
          {id:"visit",name:"專員到場",unit:"次",price:3500,kind:"yn",note:"整案一次"}],
   taxRate:0.05,company:"普印通科技股份有限公司",companyInfo:"統一編號 28210837｜電話 (02)2732-0137｜0800-581-881",
-  quoteNote:"以上金額為新台幣。"};
+  quoteNote:"",
+  // v3.5 公司報價單範本（商用臭氧機除味報價單）
+  tel:"(02) 2732-0137",fax:"(02) 2707-8550",validDays:14,payTerms:"確認預約後全額匯款",stamp:true,
+  terms:"除味時間：3天\n除味運轉時間：人跟寵物都不能入內，門窗緊閉\n除味完成：門窗打開保持通風\n\n付款方式：確認預約除味設備租用，需先全額匯款，不另收押金\n\n服務提供30天滿意保固：\n除味後30天內，如主觀認為味道還有殘留，可以再次申請除味，不用租金，只需負擔每台設備500元來回運費即可"};
 const QP_ID_OK=/^[a-z0-9_]{1,24}$/;
 const cut=(s,n)=>String(s==null?"":s).replace(/[\u0000-\u001f]/g," ").trim().slice(0,n);
 function normPricing(d){
   d=d&&typeof d==="object"?d:{};
   const items=(Array.isArray(d.items)?d.items:PRICING_DEFAULT.items).slice(0,20).map(x=>{
     x=x&&typeof x==="object"?x:{};const p=Math.round(+x.price);
+    if(x.name==="AQ得來速商用臭氧機")x={...x,name:PRICING_DEFAULT.items[0].name}; // v3.7 品項改名
     return {id:QP_ID_OK.test(String(x.id))?String(x.id):"i"+Math.random().toString(36).slice(2,8),name:cut(x.name,40),unit:cut(x.unit,6),
       price:p>=0&&p<=9999999?p:0,kind:x.kind==="yn"?"yn":"qty",note:cut(x.note,60)}}).filter(x=>x.name);
   const t=+d.taxRate;
   return {items,taxRate:t>=0&&t<=0.3?t:PRICING_DEFAULT.taxRate,
     company:cut(d.company!=null?d.company:PRICING_DEFAULT.company,60),companyInfo:cut(d.companyInfo!=null?d.companyInfo:PRICING_DEFAULT.companyInfo,160),
-    quoteNote:String(d.quoteNote!=null?d.quoteNote:PRICING_DEFAULT.quoteNote).slice(0,1000)};
+    quoteNote:String(d.quoteNote!=null?d.quoteNote:PRICING_DEFAULT.quoteNote).slice(0,1000),
+    tel:cut(d.tel!=null?d.tel:PRICING_DEFAULT.tel,30),fax:cut(d.fax!=null?d.fax:PRICING_DEFAULT.fax,30),
+    validDays:(v=>v>=1&&v<=365?v:PRICING_DEFAULT.validDays)(Math.round(+d.validDays)),
+    payTerms:cut(d.payTerms!=null?d.payTerms:PRICING_DEFAULT.payTerms,80),stamp:d.stamp!==false,
+    terms:String(d.terms!=null?d.terms:PRICING_DEFAULT.terms).replace(/\r/g,"").slice(0,1500)};
 }
 S.pricing=normPricing(null);
 const appendArr=(r,key,entry)=>F.arrayUnion&&!(r._fix||[]).includes(key)?F.arrayUnion(entry):[...((S.inq.find(x=>x.id===r.id)||r)[key]||[]),entry];
@@ -1085,7 +1133,12 @@ function calcQuote(lines,discount,rate){
   return {gross,discount:disc,subtotal,tax,total:subtotal+tax};
 }
 const QUOTE_EARLY=["新詢問","已聯繫","場勘/檢測"];
-function quoteBaseNo(r){return r.code||("P"+String(r.date||today()).slice(2,10).replace(/-/g,"")+"-"+String(r.id).slice(-4))}
+// 報價單號：日期＋當天流水號（範本格式，例如 20261019003）
+function nextQuoteNo(d){const pre=String(d).replace(/-/g,"");let n=0;
+  S.inq.forEach(r=>quotesOf(r).forEach(q=>{const m=String(q.no||"").match(/^(\d{8})(\d{3})$/);if(m&&m[1]===pre)n=Math.max(n,+m[2])}));
+  return pre+String(n+1).padStart(3,"0")}
+const salesKey=()=>"pt-crm-sales-phone:"+(S.email||"");
+const salesPhone=()=>{try{return localStorage.getItem(salesKey())||""}catch(e){return ""}};
 function openQuote(id,tries=0,from=null,seed=null){
   let r=S.inq.find(x=>x.id===id);
   if(!r){if(tries<20)setTimeout(()=>openQuote(id,tries+1,from,seed),150);else toast("找不到案件，請稍後再試");return}
@@ -1103,7 +1156,7 @@ function openQuote(id,tries=0,from=null,seed=null){
     <td>${it.kind==="yn"?`<select class="q-in" aria-label="${esc(it.name)}"><option value="0">沒有</option><option value="1" ${prevQty(it.id)?"selected":""}>有</option></select>`
       :`<input class="q-in" type="number" inputmode="numeric" min="0" max="999" step="1" value="${prevQty(it.id)}" aria-label="${esc(it.name)}數量"> ${esc(it.unit)}`}</td>
     <td class="num">${money(it.price)}</td><td class="num q-amt">—</td></tr>`;
-  const sh=openSheet(`<div class="sheet-head"><div><h2>${ver>1?"修改報價（第 "+ver+" 版）":"產生報價單"}</h2><div class="sub">${esc(r.company||"（未填客戶）")} · 價格為未稅，系統自動加 ${Math.round(P.taxRate*1000)/10}% 營業稅</div></div><button class="btn ghost" data-close>關閉</button></div>
+  const sh=openSheet(`<div class="sheet-head"><div><h2>${ver>1?"修改報價（第 "+ver+" 版）":"產生報價單"}</h2><div class="sub">${esc(custName(r))} · 價格為未稅，系統自動加 ${Math.round(P.taxRate*1000)/10}% 營業稅</div></div><button class="btn ghost" data-close>關閉</button></div>
     <form id="qForm" novalidate>
     <div class="card"><h3>報價項目</h3>
       <div class="tbl-wrap"><table class="t qtbl"><thead><tr><th>項目</th><th>數量</th><th>單價（未稅）</th><th>金額（未稅）</th></tr></thead>
@@ -1116,7 +1169,8 @@ function openQuote(id,tries=0,from=null,seed=null){
       </tfoot></table></div>
       <div class="grid" style="margin-top:10px">
         <label class="f" id="qReasonW"><span class="lbl">折扣原因 <span class="req">*</span></span><input id="qReason" maxlength="200" value="${esc(prev&&prev.discountReason||"")}" placeholder="例如：老客戶回購、多台優惠"></label>
-        <label class="f full"><span class="lbl">報價單備註</span><textarea id="qNote" rows="2" maxlength="1000">${esc(prev?prev.note||"":P.quoteNote)}</textarea></label>
+        <label class="f"><span class="lbl">業務專員電話</span><input id="qSales" maxlength="30" value="${esc(prev&&prev.salesPhone||salesPhone())}" placeholder="例如 0970-000123"></label>
+        <label class="f full"><span class="lbl">報價單備註（印在「六、備註」）</span><textarea id="qNote" rows="2" maxlength="1000">${esc(prev?prev.note||"":P.quoteNote)}</textarea></label>
       </div>
     </div>
     <div class="form-actions"><span class="err" id="qErr"></span><button type="button" class="btn" data-close>取消</button><button type="submit" class="btn primary">產生報價單${ver>1?"（第 "+ver+" 版）":""}</button></div>
@@ -1144,11 +1198,12 @@ function openQuote(id,tries=0,from=null,seed=null){
     const reason=sh.querySelector("#qReason").value.trim();
     if(c.discount&&!reason){err.textContent="有折扣時請填寫折扣原因";return}
     const cur=S.inq.find(x=>x.id===id)||r,v2=quotesOf(cur).reduce((a,q)=>Math.max(a,+q.ver||0),0)+1;
-    const no=quoteBaseNo(cur)+"-"+v2,now=new Date().toISOString(),d=today();
+    const now=new Date().toISOString(),d=today(),no=nextQuoteNo(d),sp=cut(sh.querySelector("#qSales").value,30);
+    try{if(sp)localStorage.setItem(salesKey(),sp)}catch(e){}
     const q={id:newId(),no,ver:v2,date:d,at:nowStamp(),by:S.me,byEmail:S.email,lines:used.map(({kind,...l})=>l),taxRate:P.taxRate,...c,
       discountReason:c.discount?reason.slice(0,200):"",note:sh.querySelector("#qNote").value.trim().slice(0,1000),
-      company:cur.company||"",contact:cur.contact||"",phone:cur.phone||"",address:cur.address||"",
-      seller:{company:P.company,info:P.companyInfo}};
+      company:cur.company==="個人"?"":(cur.company||""),contact:cur.contact||"",phone:cur.phone||"",address:cur.address||"",taxId:cur.taxId||"",caseCode:cur.code||"",salesPhone:sp,
+      seller:{company:P.company,info:P.companyInfo,tel:P.tel,fax:P.fax,validDays:P.validDays,payTerms:P.payTerms,terms:P.terms}};
     const entry={at:nowStamp(),by:S.me,method:"報價",note:`產生報價單 ${no}：未稅 ${money(c.subtotal)}，含稅 ${money(c.total)}${c.discount?`（折扣 ${money(c.discount)}：${q.discountReason}）`:""}`};
     const u={quotes:appendArr(cur,"quotes",q),quoteAmount:c.subtotal,quoteDate:d,quoteNo:no,updatedAt:now,updatedBy:S.email};
     // 報價單改了數量／到場，案件的「報價」區塊跟著更新
@@ -1159,35 +1214,61 @@ function openQuote(id,tries=0,from=null,seed=null){
     saveThenClose(F.updateDoc(F.doc(fs,"inquiries",id),withFix(cur,u)),sh,"#qErr","已產生報價單 "+no,()=>{S.sheetDirty=false;setTimeout(()=>openQuotePrint(id,q.id,q),60)});
   });
 }
-function quoteHtml(q){
-  const s=q.seller||{};
-  return `<div class="qdoc">
-    <div class="qdoc-h"><div><div class="qdoc-co">${esc(s.company||S.pricing.company)}</div><div class="qdoc-info">${esc(s.info||S.pricing.companyInfo)}</div></div><div class="qdoc-t">報價單</div></div>
-    <table class="qdoc-meta"><tr><th>客戶</th><td>${esc(q.company)}</td><th>報價單號</th><td>${esc(q.no)}</td></tr>
-      <tr><th>聯絡人</th><td>${esc(q.contact)}</td><th>報價日期</th><td>${esc(q.date)}</td></tr>
-      <tr><th>電話</th><td>${esc(q.phone)}</td><th>報價人</th><td>${esc(q.by)}</td></tr>
-      ${q.address?`<tr><th>地址</th><td colspan="3">${esc(q.address)}</td></tr>`:""}</table>
-    <table class="qdoc-items"><thead><tr><th>項目</th><th>數量</th><th>單價</th><th>金額</th></tr></thead><tbody>
-      ${q.lines.map(l=>`<tr><td>${esc(l.name)}</td><td class="num">${esc(l.qty)} ${esc(l.unit)}</td><td class="num">${money(l.price)}</td><td class="num">${money(l.amount)}</td></tr>`).join("")}
-      ${q.discount?`<tr><td>折扣${q.discountReason?"（"+esc(q.discountReason)+"）":""}</td><td></td><td></td><td class="num">−${money(q.discount)}</td></tr>`:""}
-    </tbody><tfoot>
-      <tr><td colspan="3">小計（未稅）</td><td class="num">${money(q.subtotal)}</td></tr>
-      <tr><td colspan="3">營業稅 ${Math.round((+q.taxRate||0)*1000)/10}%</td><td class="num">${money(q.tax)}</td></tr>
-      <tr class="qtot"><td colspan="3">總計（含稅）</td><td class="num">${money(q.total)}</td></tr></tfoot></table>
-    ${q.note?`<div class="qdoc-note">${esc(q.note)}</div>`:""}
+// 報價單：照公司範本（商用臭氧機除味報價單）排版，A4 橫式
+const QROWS=10;
+function quoteHtml(q,stamp){
+  const s=q.seller||{},P=S.pricing,v=(k)=>s[k]!=null?s[k]:P[k];
+  const [Y,M,Dd]=String(q.date||"").split("-");
+  const rows=q.lines.map(l=>`<tr><td>${esc(l.name)}</td><td class="c">${esc(l.qty)}</td><td class="num">${money(l.price).replace("$","")}</td><td class="num">${money(l.amount).replace("$","")}</td></tr>`);
+  if(q.discount)rows.push(`<tr><td>折扣${q.discountReason?"（"+esc(q.discountReason)+"）":""}</td><td></td><td></td><td class="num">−${money(q.discount).replace("$","")}</td></tr>`);
+  while(rows.length<QROWS)rows.push(`<tr class="blank"><td>&nbsp;</td><td></td><td></td><td></td></tr>`);
+  const rate=Math.round((+q.taxRate||0)*1000)/10;
+  const terms=`${q.address?`案件地址：${esc(q.address)}\n\n`:"案件地址：\n\n"}${esc(v("terms")||"")}`;
+  return `<div class="qdoc qtpl">
+    <div class="qt-head"><img src="img/qt-logo.jpg" alt="普印通 Print Town Technology" class="qt-logo"><img src="img/qt-name.jpg" alt="${esc(s.company||P.company)}" class="qt-name"><span></span></div>
+    <table class="qt-main">
+      <colgroup><col class="w-name"><col class="w-qty"><col class="w-pr"><col class="w-amt"><col class="w-note"></colgroup>
+      <tr><th colspan="5" class="qt-title">報　價　單</th></tr>
+      <tr><td colspan="4" class="qt-cust">客戶：${esc(q.company||(q.contact?q.contact+"（個人）":""))}${q.company&&q.contact?`　聯絡人：${esc(q.contact)}`:""}</td><td class="qt-date">日期：<span>${esc(Y||"")}</span> 年 <span>${esc(M||"")}</span> 月 <span>${esc(Dd||"")}</span> 日</td></tr>
+      <tr class="qt-hd"><th>品名規格</th><th>數量</th><th>單價</th><th>合計</th><th>備註</th></tr>
+      ${rows.map((r,i)=>i===0?r.replace(/<\/tr>$/,`<td class="qt-terms" rowspan="${rows.length+3}">${terms}</td></tr>`):r).join("")}
+      <tr class="qt-sum"><td colspan="3" class="r">小計（未稅）：</td><td class="num">${money(q.subtotal).replace("$","")}</td></tr>
+      <tr class="qt-sum"><td colspan="3" class="r">營業稅 ${rate}%：</td><td class="num">${money(q.tax).replace("$","")}</td></tr>
+      <tr class="qt-tot"><td colspan="3" class="r">總價（含稅）：</td><td class="num">${money(q.total).replace("$","")}</td></tr>
+    </table>
+    <div class="qt-info">
+      <div>一、報價單號：${esc(q.no)}<br>二、詢價編號：${esc(q.caseCode||"")}${q.ver?`（第 ${esc(q.ver)} 版）`:""}<br>三、有效期限為報價 ${esc(v("validDays"))} 日內有效</div>
+      <div>四、產品單價為：未稅（另加營業稅 ${rate}%）<br>五、收款條件：${esc(v("payTerms")||"")}<br>六、備註：${esc(q.note||"")}</div>
+      <div>電話：${esc(v("tel")||"")}<br>傳真：${esc(v("fax")||"")}</div>
+      <div>業務專員：${esc(q.by||"")} ${esc(q.salesPhone||"")}</div>
+    </div>
+    <div class="qt-foot">
+      <div class="qt-confirm"><b>訂購確認欄</b>
+        <table><tr><td>客戶確認簽署：</td><td>簽訂日期：</td><td>統一編號：${esc(q.taxId||"")}</td></tr>
+          <tr><td>送貨聯絡人：${esc(q.contact||"")}</td><td>連絡電話：${esc(q.phone||"")}</td><td>傳真號碼：</td></tr>
+          <tr><td colspan="2">送貨地址：${esc(q.address||"")}</td><td>送貨備註：</td></tr></table></div>
+      ${stamp!==false?`<img src="img/qt-stamp.jpg" alt="報價專用章" class="qt-stamp">`:`<span class="qt-stamp"></span>`}
+    </div>
   </div>`;
 }
 function openQuotePrint(id,qid,fallback){
   const r=S.inq.find(x=>x.id===id),q=(r&&quotesOf(r).find(x=>x.id===qid))||fallback;if(!q)return;
   const sh=openSheet(`<div class="sheet-head"><div><h2>報價單 ${esc(q.no)}</h2><div class="sub">第 ${esc(q.ver)} 版 · ${esc(q.date)} · 含稅 ${money(q.total)}</div></div>
-    ${r?`<button class="btn sm" id="qEdit">修改數量／備註</button>`:""}<button class="btn primary sm" id="qPrint">列印／存成 PDF</button><button class="btn ghost" data-close>關閉</button></div>${quoteHtml(q)}
-    <p class="note">報價單樣式為暫定，之後會換成公司標準格式。存成 PDF：列印視窗的「目的地」選「另存為 PDF」。按「修改數量／備註」會產生新的一版，這一版保留不變。</p>`);
+    ${r?`<button class="btn sm" id="qEdit">修改數量／備註</button>`:""}<button class="btn primary sm" id="qPrint">列印／存成 PDF</button><button class="btn ghost" data-close>關閉</button></div>
+    <label class="qt-stampsw"><input type="checkbox" id="qStamp" ${S.pricing.stamp?"checked":""}> 加蓋報價專用章</label>
+    <div class="qt-wrap"><div id="qDocBox">${quoteHtml(q,S.pricing.stamp)}</div></div>
+    <p class="note">列印時請選「橫向」。存成 PDF：列印視窗的「目的地」選「另存為 PDF」。按「修改數量／備註」會產生新的一版，這一版保留不變。</p>`);
+  // 預覽縮放到視窗寬度（列印時是原尺寸 A4 橫式）
+  const fit=()=>{const w=sh.querySelector(".qt-wrap"),d=sh.querySelector(".qtpl");if(!w||!d)return;const z=Math.min(1,(w.clientWidth-2)/1040);d.style.zoom=z>0?String(z):"1"};
+  const stampEl=sh.querySelector("#qStamp");stampEl.onchange=()=>{sh.querySelector("#qDocBox").innerHTML=quoteHtml(q,stampEl.checked);fit()};
+  fit();const onRs=()=>fit();window.addEventListener("resize",onRs);S.onSheetClose=()=>window.removeEventListener("resize",onRs);
   sh.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>{closeSheet();if(r)openDetail(id)});
   const qe=sh.querySelector("#qEdit");if(qe)qe.onclick=()=>{closeSheet();openQuote(id,0,q)};
   sh.querySelector("#qPrint").onclick=()=>{
     let root=document.getElementById("printRoot");if(!root){root=document.createElement("div");root.id="printRoot";document.body.appendChild(root)}
-    root.innerHTML=quoteHtml(q);document.body.classList.add("printing");
-    const done=()=>{document.body.classList.remove("printing");root.innerHTML="";window.removeEventListener("afterprint",done)};
+    root.innerHTML=quoteHtml(q,stampEl.checked);document.body.classList.add("printing");
+    const oldTitle=document.title;document.title="報價單_"+q.no+"_"+(q.company||q.contact||"");
+    const done=()=>{document.body.classList.remove("printing");root.innerHTML="";document.title=oldTitle;window.removeEventListener("afterprint",done)};
     window.addEventListener("afterprint",done);window.print();setTimeout(()=>{if(!window.matchMedia("print").matches)done()},1500)};
 }
 function quoteCard(r){
@@ -1213,7 +1294,14 @@ function renderPricing(B){
       <label class="f"><span class="lbl">營業稅率（%）</span><input id="prTax" type="number" min="0" max="30" step="0.1" value="${Math.round(P.taxRate*1000)/10}" ${dis}></label>
       <label class="f"><span class="lbl">公司名稱</span><input id="prCo" maxlength="60" value="${esc(P.company)}" ${dis}></label>
       <label class="f full"><span class="lbl">公司資訊（統編、電話等）</span><input id="prInfo" maxlength="160" value="${esc(P.companyInfo)}" ${dis}></label>
-      <label class="f full"><span class="lbl">報價單預設備註</span><textarea id="prNote" rows="2" maxlength="1000" ${dis}>${esc(P.quoteNote)}</textarea></label></div></div>
+      <label class="f full"><span class="lbl">報價單預設備註（印在「六、備註」，每份報價可修改）</span><textarea id="prNote" rows="2" maxlength="1000" ${dis}>${esc(P.quoteNote)}</textarea></label></div></div>
+    <div class="card"><h3>報價單範本內容</h3><div class="grid">
+      <label class="f"><span class="lbl">公司電話</span><input id="prTel" maxlength="30" value="${esc(P.tel)}" ${dis}></label>
+      <label class="f"><span class="lbl">公司傳真</span><input id="prFax" maxlength="30" value="${esc(P.fax)}" ${dis}></label>
+      <label class="f"><span class="lbl">報價有效期限（天）</span><input id="prValid" type="number" min="1" max="365" value="${esc(P.validDays)}" ${dis}></label>
+      <label class="f"><span class="lbl">收款條件</span><input id="prPay" maxlength="80" value="${esc(P.payTerms)}" ${dis}></label>
+      <label class="f full"><span class="lbl">右側「備註」欄內容（案件地址會自動放在最上面）</span><textarea id="prTerms" rows="8" maxlength="1500" ${dis}>${esc(P.terms)}</textarea></label>
+      <label class="f full"><span><input type="checkbox" id="prStamp" ${P.stamp?"checked":""} ${dis}> 報價單預設加蓋報價專用章（列印前仍可取消）</span></label></div></div>
     ${ed?`<div class="form-actions"><span class="err" id="prErr"></span><button class="btn primary" id="prSave">儲存報價設定</button></div>`:""}`;
     if(!ed)return;
     B.querySelectorAll(".prtbl [data-k]").forEach(el=>el.addEventListener("input",()=>{const x=items[+el.closest("tr").dataset.i];x[el.dataset.k]=el.dataset.k==="price"?el.value:el.value}));
@@ -1227,7 +1315,11 @@ function renderPricing(B){
       if(clean.some(x=>!(x.price>=0&&x.price<=9999999))){err.textContent="單價要是 0～9,999,999 的整數";return}
       if(!(tax>=0&&tax<=30)){err.textContent="稅率要在 0～30% 之間";return}
       const doc={items:clean,taxRate:Math.round(tax*10)/1000,company:cut(B.querySelector("#prCo").value,60),companyInfo:cut(B.querySelector("#prInfo").value,160),
-        quoteNote:B.querySelector("#prNote").value.slice(0,1000),updatedAt:new Date().toISOString(),by:S.email};
+        quoteNote:B.querySelector("#prNote").value.slice(0,1000),
+        tel:cut(B.querySelector("#prTel").value,30),fax:cut(B.querySelector("#prFax").value,30),validDays:Math.round(+B.querySelector("#prValid").value),
+        payTerms:cut(B.querySelector("#prPay").value,80),terms:B.querySelector("#prTerms").value.replace(/\r/g,"").slice(0,1500),stamp:B.querySelector("#prStamp").checked,
+        updatedAt:new Date().toISOString(),by:S.email};
+      if(!(doc.validDays>=1&&doc.validDays<=365)){err.textContent="有效期限要在 1～365 天";return}
       S.pricing=normPricing(doc);write(F.setDoc(F.doc(fs,"config","pricing"),doc),"報價設定已儲存");
     };
   };
@@ -1318,7 +1410,7 @@ function renderDash(){
     ["care","30日滿意保固提醒",base.filter(careDue),r=>`成交 ${wonDays(r)} 天`],
     ["soon","5 天內將自動結案",base.filter(soonLost),r=>`剩 ${lostLeft(r)} 天`]
   ];
-  const todo=lists.map(([key,title,arr,meta])=>`<div class="todo-col ${key}"><h4>${title}<b>${arr.length}</b></h4>${arr.slice(0,6).map(r=>`<button class="todo-item" data-id="${esc(r.id)}"><span>${esc(r.company||"（未填客戶）")}</span><small>${esc(meta(r))} · ${esc(r.owner||"未指派")}</small></button>`).join("")||'<div class="todo-empty">沒有</div>'}${arr.length>6?`<button class="todo-more" data-go="${key}">看全部 ${arr.length} 件 →</button>`:""}</div>`).join("");
+  const todo=lists.map(([key,title,arr,meta])=>`<div class="todo-col ${key}"><h4>${title}<b>${arr.length}</b></h4>${arr.slice(0,6).map(r=>`<button class="todo-item" data-id="${esc(r.id)}"><span>${esc(custName(r))}</span><small>${esc(meta(r))} · ${esc(r.owner||"未指派")}</small></button>`).join("")||'<div class="todo-empty">沒有</div>'}${arr.length>6?`<button class="todo-more" data-go="${key}">看全部 ${arr.length} 件 →</button>`:""}</div>`).join("");
 
   // 詢價頻率：近 12 週，依業務線堆疊
   const L=lines(),wk=[];const now=new Date();const mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));mon.setHours(0,0,0,0);
@@ -1381,7 +1473,7 @@ function renderDash(){
       <div class="note">待處理 = 逾期未跟進＋超過 ${rr.remind.hours} 小時未追蹤</div></div>
     <div class="card full"><h3>最近成交</h3>
       <div class="tbl-wrap"><table class="t won"><thead><tr><th>客戶</th><th>服務</th><th>來源</th><th>成交日期</th><th>金額</th><th>接單同仁</th></tr></thead>
-      <tbody>${recentWon.map(r=>`<tr class="clk" data-id="${esc(r.id)}"><td>${esc(r.company||"")}</td><td style="font-family:var(--sans)">${esc((r.services||[]).join("、"))}</td><td style="font-family:var(--sans)">${esc(r.channel||"")}</td><td>${esc(r.wonDate||r.closedAt||"")}</td><td>${money(r.wonAmount)}</td><td style="font-family:var(--sans)">${esc(r.owner||"")}</td></tr>`).join("")||'<tr><td colspan="6" class="dim">還沒有成交案件</td></tr>'}</tbody></table></div></div>
+      <tbody>${recentWon.map(r=>`<tr class="clk" data-id="${esc(r.id)}"><td>${esc(custName(r))}</td><td style="font-family:var(--sans)">${esc((r.services||[]).join("、"))}</td><td style="font-family:var(--sans)">${esc(r.channel||"")}</td><td>${esc(r.wonDate||r.closedAt||"")}</td><td>${money(r.wonAmount)}</td><td style="font-family:var(--sans)">${esc(r.owner||"")}</td></tr>`).join("")||'<tr><td colspan="6" class="dim">還沒有成交案件</td></tr>'}</tbody></table></div></div>
   </div>`;
   V.querySelector("#dRange").onchange=e=>{S.dRange=e.target.value;S.recN=30;renderDash()};
   V.querySelector("#dMine").onchange=e=>{S.dMine=e.target.checked;renderDash()};
@@ -1422,7 +1514,7 @@ function renderDashMore(V,rows){
     .filter(([,id])=>on(id)).map(([t,id])=>distCard(t,rows,r=>{const v=r[id];if(id==="returning")return v==="是"?"舊客戶":v==="否"?"新客戶":"未確認";return v==null?[]:v})).join("");
   // 客戶排行：同一個公司／單位名稱合併
   const m=new Map();
-  rows.forEach(r=>{const k=String(r.company||"（未填）").trim();const o=m.get(k)||{k,n:0,won:0,amt:0,last:"",owner:"",ids:[]};
+  rows.forEach(r=>{const k=String(custName(r)).trim();const o=m.get(k)||{k,n:0,won:0,amt:0,last:"",owner:"",ids:[]};
     o.n++;o.ids.push(r.id);if(r.stage==="成交"){o.won++;o.amt+=(+r.wonAmount||0)}if((r.date||"")>o.last){o.last=r.date||"";o.owner=r.owner||""}m.set(k,o)});
   const custs=[...m.values()].sort((a,b)=>b.amt-a.amt||b.n-a.n);
   const repeat=custs.filter(c=>c.n>=2).length;
@@ -1445,7 +1537,7 @@ function renderDashMore(V,rows){
     list.sort((a,b)=>{let x=a[k],y=b[k];if(Array.isArray(x))x=x.join("");if(Array.isArray(y))y=y.join("");
       if(k==="quoteAmount"){x=+x||0;y=+y||0;return (x-y)*d}return String(x||"").localeCompare(String(y||""))*d});
     const st=r=>STAGE_MAP[r.stage]||STAGES[0];
-    box.querySelector("#recBody").innerHTML=list.slice(0,S.recN).map(r=>`<tr class="clk" data-id="${esc(r.id)}"><td>${esc(r.date||"")}</td><td>${esc(r.code||"")}</td><td>${esc(r.company||"")}</td><td>${esc((r.services||[]).join("、"))}</td><td>${esc(r.city||"")}</td><td>${esc(r.channel||"")}</td><td><span class="stage ${st(r).c}">${esc(r.stage||"")}</span></td><td>${r.quoteAmount?money(r.quoteAmount):""}</td><td>${esc(r.owner||"")}</td></tr>`).join("")||'<tr><td colspan="9" class="dim">沒有符合的紀錄</td></tr>';
+    box.querySelector("#recBody").innerHTML=list.slice(0,S.recN).map(r=>`<tr class="clk" data-id="${esc(r.id)}"><td>${esc(r.date||"")}</td><td>${esc(r.code||"")}</td><td>${esc(custName(r))}</td><td>${esc((r.services||[]).join("、"))}</td><td>${esc(r.city||"")}</td><td>${esc(r.channel||"")}</td><td><span class="stage ${st(r).c}">${esc(r.stage||"")}</span></td><td>${r.quoteAmount?money(r.quoteAmount):""}</td><td>${esc(r.owner||"")}</td></tr>`).join("")||'<tr><td colspan="9" class="dim">沒有符合的紀錄</td></tr>';
     box.querySelectorAll("#recBody [data-id]").forEach(tr=>tr.onclick=()=>openDetail(tr.dataset.id));
     const more=box.querySelector("#recMore");more.hidden=list.length<=S.recN;more.textContent=`顯示更多（還有 ${Math.max(0,list.length-S.recN)} 筆）`;
   };
@@ -1673,7 +1765,7 @@ function renderOptions(B){
     const L=id=>B.querySelector(id).value.split("\n").map(s=>s.trim()).filter(Boolean);
     const services=L("#c_svc").map(s=>{const p=s.split(/[｜|]/);return p.length>1?{line:p[0].trim(),name:p.slice(1).join("｜").trim()}:{line:"其他",name:s}}).filter(s=>s.name);
     if(!services.length){B.querySelector("#cErr").textContent="服務項目至少要一項";return}
-    write(F.setDoc(F.doc(fs,"config","options"),{services,methods:L("#c_m"),updatedAt:new Date().toISOString()}),"已儲存");
+    write(F.setDoc(F.doc(fs,"config","options"),{services,methods:L("#c_m"),rev:OPT_REV,updatedAt:new Date().toISOString()}),"已儲存");
   });
 }
 function renderMembers(B){
